@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csd-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: csd-app
+  template:
+    metadata:
+      labels:
+        app: csd-app
+    spec:
+      containers:
+      - name: nginx-csd
+        image: titoyannis/my-wget-nginx:v1
+        env:
+        - name: SITE_URL
+          value: "https://www.csd.uoc.gr"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: csd-service
+spec:
+  selector:
+    app: csd-app
+  ports:
+    - port: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: math-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: math-app
+  template:
+    metadata:
+      labels:
+        app: math-app
+    spec:
+      containers:
+      - name: nginx-math
+        image: titoyannis/my-wget-nginx:v1
+        env:
+        - name: SITE_URL
+          value: "https://www.math.uoc.gr"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: math-service
+spec:
+  selector:
+    app: math-app
+  ports:
+    - port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: univ-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx 
+  rules:
+  - http:
+      paths:
+      - path: /csd
+        pathType: Prefix
+        backend:
+          service:
+            name: csd-service
+            port:
+              number: 80
+      - path: /math
+        pathType: Prefix
+        backend:
+          service:
+            name: math-service
+            port:
+              number: 80

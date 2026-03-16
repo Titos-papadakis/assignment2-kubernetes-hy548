@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: site-storage-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: downloader-script
+data:
+  download.sh: |
+    #!/bin/bash
+    apt-get update && apt-get install -y wget
+    # Κατεβάζουμε το site απευθείας μέσα στο /data
+    wget -E -k -p -nH --cut-dirs=1 https://www.csd.uoc.gr -P /data
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-server
+  labels:
+    app: web
+spec:
+  containers:
+  - name: nginx-container
+    image: nginx:latest
+    volumeMounts:
+    - name: site-data
+      mountPath: /usr/share/nginx/html 
+  volumes:
+  - name: site-data
+    persistentVolumeClaim:
+      claimName: site-storage-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: csd-refresh-cron
+spec:
+  schedule: "15 2 * * *" 
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: updater
+            image: ubuntu:24.04
+            command: ["/bin/bash", "/scripts/download.sh"]
+            volumeMounts:
+            - name: script-storage
+              mountPath: /scripts
+            - name: site-storage
+              mountPath: /data
+          restartPolicy: OnFailure
+          volumes:
+          - name: script-storage
+            configMap:
+              name: downloader-script
+          - name: site-storage
+            persistentVolumeClaim:
+              claimName: site-storage-pvc
